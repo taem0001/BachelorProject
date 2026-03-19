@@ -8,13 +8,15 @@ import sys
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="input test file")
+    parser.add_argument(
+        "-a", "--assembly", help="generates assembly file", action="store_true"
+    )
     args = parser.parse_args()
 
     input = args.input
 
     base_dir = pathlib.Path(__file__).parent.resolve()
     input_path = os.path.join(base_dir, input)
-    compiler_bin_path = os.path.join(base_dir, "compiler/build/bin")
     if not os.path.isfile(input_path):
         sys.exit("Input file doesn't exist.")
 
@@ -75,3 +77,16 @@ if __name__ == "__main__":
             f"{input_no_ext}.bin",
         ]
     )
+
+    if args.assembly:
+        print(f"Generating assembly file from {input}")
+        subprocess.run(
+            [
+                "./compiler/build/bin/llc",
+                "-mtriple=riscv32",
+                "-O0",
+                f"{input_no_ext}.opt.ll",
+                "-o",
+                f"{input_no_ext}.s",
+            ]
+        )

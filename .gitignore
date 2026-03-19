@@ -3,6 +3,7 @@
 *.bin
 *.ll
 *.o
+*.s
 
 # Folders
 .vscode/
