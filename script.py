@@ -13,20 +13,22 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    input = args.input
+    input_file = args.input
 
     base_dir = pathlib.Path(__file__).parent.resolve()
-    input_path = os.path.join(base_dir, input)
-    if not os.path.isfile(input_path):
+    input_path = base_dir / input_file
+    if not input_path.is_file():
         sys.exit("Input file doesn't exist.")
 
-    if not input.endswith(".c"):
+    if not input_file.endswith(".c"):
         sys.exit("Input file is not a C file.")
 
-    input_no_ext = input.replace(".c", "")
+    input_no_ext = input_file.replace(".c", "")
+
+    compiler_bin_dir = base_dir / "compiler" / "build" / "bin"
 
     # .c -> .ll
-    print(f"Converting {input} to {input_no_ext}.ll")
+    print(f"Converting {input_file} to {input_no_ext}.ll")
     subprocess.run(
         [
             "clang",
@@ -37,9 +39,9 @@ if __name__ == "__main__":
             "-disable-O0-optnone",
             "-S",
             "-emit-llvm",
-            f"{input}",
+            str(input_path),
             "-o",
-            f"{input_no_ext}.ll",
+            str(base_dir / f"{input_no_ext}.ll"),
         ]
     )
 
@@ -47,12 +49,12 @@ if __name__ == "__main__":
     print(f"Converting {input_no_ext}.ll to {input_no_ext}.opt.ll")
     subprocess.run(
         [
-            "./compiler/build/bin/opt",
+            str(compiler_bin_dir / "opt"),
             "-S",
             "-passes=mem2reg",
-            f"{input_no_ext}.ll",
+            str(base_dir / f"{input_no_ext}.ll"),
             "-o",
-            f"{input_no_ext}.opt.ll",
+            str(base_dir / f"{input_no_ext}.opt.ll"),
         ]
     )
 
@@ -60,13 +62,13 @@ if __name__ == "__main__":
     print(f"Converting {input_no_ext}.opt.ll to {input_no_ext}.o")
     subprocess.run(
         [
-            "./compiler/build/bin/llc",
+            str(compiler_bin_dir / "llc"),
             "-mtriple=riscv32",
             "-O0",
             "-filetype=obj",
-            f"{input_no_ext}.opt.ll",
+            str(base_dir / f"{input_no_ext}.opt.ll"),
             "-o",
-            f"{input_no_ext}.o",
+            str(base_dir / f"{input_no_ext}.o"),
         ]
     )
     
@@ -74,24 +76,24 @@ if __name__ == "__main__":
     print(f"Converting {input_no_ext}.o to {input_no_ext}.bin")
     subprocess.run(
         [
-            "./compiler/build/bin/llvm-objcopy",
+            str(compiler_bin_dir / "llvm-objcopy"),
             "-O",
             "binary",
-            f"{input_no_ext}.o",
-            f"{input_no_ext}.bin",
+            str(base_dir / f"{input_no_ext}.o"),
+            str(base_dir / f"{input_no_ext}.bin"),
         ]
     )
 
     if args.assembly:
         # .opt.ll -> .s
-        print(f"Generating assembly file from {input}")
+        print(f"Generating assembly file from {input_file}")
         subprocess.run(
             [
-                "./compiler/build/bin/llc",
+                str(compiler_bin_dir / "llc"),
                 "-mtriple=riscv32",
                 "-O0",
-                f"{input_no_ext}.opt.ll",
+                str(base_dir / f"{input_no_ext}.opt.ll"),
                 "-o",
-                f"{input_no_ext}.s",
+                str(base_dir / f"{input_no_ext}.s"),
             ]
         )
