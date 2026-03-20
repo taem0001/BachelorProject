@@ -25,6 +25,7 @@ if __name__ == "__main__":
 
     input_no_ext = input.replace(".c", "")
 
+    # .c -> .ll
     print(f"Converting {input} to {input_no_ext}.ll")
     subprocess.run(
         [
@@ -42,6 +43,7 @@ if __name__ == "__main__":
         ]
     )
 
+    # .ll -> .opt.ll
     print(f"Converting {input_no_ext}.ll to {input_no_ext}.opt.ll")
     subprocess.run(
         [
@@ -54,6 +56,7 @@ if __name__ == "__main__":
         ]
     )
 
+    # .opt.ll -> .o
     print(f"Converting {input_no_ext}.opt.ll to {input_no_ext}.o")
     subprocess.run(
         [
@@ -66,7 +69,8 @@ if __name__ == "__main__":
             f"{input_no_ext}.o",
         ]
     )
-
+    
+    # .o -> .bin
     print(f"Converting {input_no_ext}.o to {input_no_ext}.bin")
     subprocess.run(
         [
@@ -79,6 +83,7 @@ if __name__ == "__main__":
     )
 
     if args.assembly:
+        # .opt.ll -> .s
         print(f"Generating assembly file from {input}")
         subprocess.run(
             [
