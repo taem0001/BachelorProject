@@ -6,6 +6,13 @@ import sys
 
 
 if __name__ == "__main__":
+    # Remove old generated files
+    print("Cleaning up old generated files...")
+    for ext in [".ll", ".opt.ll", ".o", ".bin", ".s"]:
+        for file in pathlib.Path(__file__).parent.glob(f"*{ext}"):
+            file.unlink()
+   
+    # Parse command-line arguments 
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="input test file")
     parser.add_argument(
@@ -33,6 +40,8 @@ if __name__ == "__main__":
         [
             "clang",
             "--target=riscv32",
+            "-march=rv32i",
+            "-mabi=ilp32",
             "-O0",
             "-fomit-frame-pointer",
             "-Xclang",
@@ -42,7 +51,8 @@ if __name__ == "__main__":
             str(input_path),
             "-o",
             str(base_dir / f"{input_no_ext}.ll"),
-        ]
+        ],
+        check=True,
     )
 
     # .ll -> .opt.ll
@@ -55,7 +65,8 @@ if __name__ == "__main__":
             str(base_dir / f"{input_no_ext}.ll"),
             "-o",
             str(base_dir / f"{input_no_ext}.opt.ll"),
-        ]
+        ],
+        check=True,
     )
 
     # .opt.ll -> .o
@@ -64,12 +75,16 @@ if __name__ == "__main__":
         [
             str(compiler_bin_dir / "llc"),
             "-mtriple=riscv32",
+            "-mcpu=generic-rv32",
+            "-mattr=-c",
+            "-mattr=-zca",
             "-O0",
             "-filetype=obj",
             str(base_dir / f"{input_no_ext}.opt.ll"),
             "-o",
             str(base_dir / f"{input_no_ext}.o"),
-        ]
+        ],
+        check=True,
     )
     
     # .o -> .bin
@@ -81,9 +96,11 @@ if __name__ == "__main__":
             "binary",
             str(base_dir / f"{input_no_ext}.o"),
             str(base_dir / f"{input_no_ext}.bin"),
-        ]
+        ],
+        check=True,
     )
 
+    # Generate assembly file if requested
     if args.assembly:
         # .opt.ll -> .s
         print(f"Generating assembly file from {input_file}")
@@ -91,9 +108,13 @@ if __name__ == "__main__":
             [
                 str(compiler_bin_dir / "llc"),
                 "-mtriple=riscv32",
+                "-mcpu=generic-rv32",
+                "-mattr=-c",
+                "-mattr=-zca",
                 "-O0",
                 str(base_dir / f"{input_no_ext}.opt.ll"),
                 "-o",
                 str(base_dir / f"{input_no_ext}.s"),
-            ]
+            ],
+            check=True
         )
