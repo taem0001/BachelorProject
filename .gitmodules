@@ -1,6 +1,6 @@
 [submodule "simulator"]
 	path = simulator
-	url = git@github.com:taem0001/Bachelor-Simulator.git
+	url = https://github.com/taem0001/Bachelor-Simulator.git
 [submodule "compiler"]
 	path = compiler
-	url = git@github.com:mathiasbd/compiler_bachelor.git
+	url = https://github.com/mathiasbd/compiler_bachelor.git
