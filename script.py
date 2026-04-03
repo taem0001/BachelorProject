@@ -6,6 +6,22 @@ import sys
 
 
 def compile_test(input_file, assembly=False, tagged=False):
+    base_dir = pathlib.Path(__file__).parent.resolve()
+    subprocess.run(
+        [
+            "cmake",
+            "--build",
+            "compiler/build",
+            "--target",
+            "opt",
+            "llc",
+            "llvm-objcopy",
+            "llvm-objdump",
+        ],
+        check=True,
+        cwd=str(base_dir),
+    )
+
     # Remove old generated files
     print("Cleaning up old generated files")
     test_dir = pathlib.Path(__file__).parent / "tests"
