@@ -4,6 +4,9 @@
 *.ll
 *.o
 *.s
+*.elf
 
 # Folders
 .vscode/
+.venv/
+__pycache__/
