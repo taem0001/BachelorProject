@@ -48,6 +48,7 @@ def compile_test(input_file, tagged=False):
     clang = resolve_executable("clang", compiler_bin_dir)
     opt = resolve_executable("opt", compiler_bin_dir)
     llc = resolve_executable("llc", compiler_bin_dir)
+    llvm_mc = resolve_executable("llvm-mc", compiler_bin_dir)
     lld = resolve_executable("lld", compiler_bin_dir)
     llvm_objcopy = resolve_executable("llvm-objcopy", compiler_bin_dir)
 
@@ -59,6 +60,7 @@ def compile_test(input_file, tagged=False):
             "--target",
             "opt",
             "llc",
+            "llvm-mc",
             "lld",
             "llvm-objcopy",
             "llvm-objdump",
@@ -80,6 +82,8 @@ def compile_test(input_file, tagged=False):
     obj_path = test_dir / f"{input_no_ext}.o"
     elf_path = test_dir / f"{input_no_ext}.elf"
     bin_path = test_dir / f"{input_no_ext}.bin"
+
+    tagged_mattr_flag = "--mattr=+tagged-mem-stores"
 
     # Remove old generated files
     print(f"Cleaning generated files for {input_no_ext}")
@@ -111,13 +115,15 @@ def compile_test(input_file, tagged=False):
 
     # .ll -> .opt.ll
     if tagged:
-        print(f"[2/6] Optimize IR (tagged stores): {ll_path.name} -> {opt_ll_path.name}")
+        print(
+            f"[2/6] Optimize IR (tagged stores): {ll_path.name} -> {opt_ll_path.name}"
+        )
         subprocess.run(
             [
                 opt,
                 "-S",
                 "-passes=mem2reg",
-                "-mattr=+tagged-mem-stores",
+                tagged_mattr_flag,
                 str(ll_path),
                 "-o",
                 str(opt_ll_path),
@@ -140,18 +146,21 @@ def compile_test(input_file, tagged=False):
 
     # .opt.ll -> .s
     print(f"[3/6] Emit assembly: {opt_ll_path.name} -> {asm_path.name}")
+    llc_cmd = [
+        llc,
+        "-mtriple=riscv32",
+        "-mcpu=generic-rv32",
+        "-mattr=-c",
+        "-mattr=-zca",
+        "-O0",
+        str(opt_ll_path),
+        "-o",
+        str(asm_path),
+    ]
+    if tagged:
+        llc_cmd.insert(5, tagged_mattr_flag)
     subprocess.run(
-        [
-            llc,
-            "-mtriple=riscv32",
-            "-mcpu=generic-rv32",
-            "-mattr=-c",
-            "-mattr=-zca",
-            "-O0",
-            str(opt_ll_path),
-            "-o",
-            str(asm_path),
-        ],
+        llc_cmd,
         check=True,
     )
 
@@ -161,17 +170,18 @@ def compile_test(input_file, tagged=False):
 
     # .s -> .o
     print(f"[5/6] Assemble object: {asm_path.name} -> {obj_path.name}")
+    asm_mattr = "-mattr=+tagged-mem-stores,-c,-zca" if tagged else "-mattr=-c,-zca"
+    asm_cmd = [
+        llvm_mc,
+        "-triple=riscv32",
+        asm_mattr,
+        "-filetype=obj",
+        str(asm_path),
+        "-o",
+        str(obj_path),
+    ]
     subprocess.run(
-        [
-            clang,
-            "--target=riscv32-unknown-elf",
-            "-march=rv32i",
-            "-mabi=ilp32",
-            "-c",
-            str(asm_path),
-            "-o",
-            str(obj_path),
-        ],
+        asm_cmd,
         check=True,
     )
 
