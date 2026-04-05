@@ -269,7 +269,7 @@ def run_test(input_file):
     if simulator_executable is None:
         sys.exit(f"Could not find simulator executable in: {simulator_build_path}")
 
-    output_path = test_dir / f"{input_path.name}.txt"
+    output_path = test_dir / f"{input_path.stem}.txt"
     with output_path.open("w") as output_file:
         subprocess.run(
             [str(simulator_executable), str(input_file_path)],
