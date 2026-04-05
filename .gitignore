@@ -5,6 +5,7 @@
 *.o
 *.s
 *.elf
+*.txt
 
 # Folders
 .vscode/
