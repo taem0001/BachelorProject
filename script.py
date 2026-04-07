@@ -52,23 +52,6 @@ def compile_test(input_file, tagged=False):
     lld = resolve_executable("lld", compiler_bin_dir)
     llvm_objcopy = resolve_executable("llvm-objcopy", compiler_bin_dir)
 
-    subprocess.run(
-        [
-            "cmake",
-            "--build",
-            "compiler/build",
-            "--target",
-            "opt",
-            "llc",
-            "llvm-mc",
-            "lld",
-            "llvm-objcopy",
-            "llvm-objdump",
-        ],
-        check=True,
-        cwd=str(base_dir),
-    )
-
     input_path = test_dir / input_file
     if not input_path.is_file():
         sys.exit("Input file doesn't exist.")
@@ -240,21 +223,6 @@ def run_test(input_file):
     if not input_file_path.is_file():
         sys.exit(f"Compiled binary doesn't exist: {input_file_path}")
 
-    # Configure once if needed, then build.
-    if not (simulator_build_path / "CMakeCache.txt").is_file():
-        subprocess.run(
-            [
-                "cmake",
-                "-S",
-                str(simulator_source_path),
-                "-B",
-                str(simulator_build_path),
-            ],
-            check=True,
-        )
-
-    subprocess.run(["cmake", "--build", str(simulator_build_path)], check=True)
-
     simulator_names = (
         ["simulator.exe", "simulator"]
         if os.name == "nt"
@@ -297,11 +265,45 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Compile all test files
+    base_dir = pathlib.Path(__file__).parent.resolve()
+    subprocess.run(
+        [
+            "cmake",
+            "--build",
+            "compiler/build",
+            "--target",
+            "opt",
+            "llc",
+            "llvm-mc",
+            "lld",
+            "llvm-objcopy",
+            "llvm-objdump",
+        ],
+        check=True,
+        cwd=str(base_dir),
+    )
+
     test_files = list(get_test_files())
     for file in test_files:
         compile_test(file.name, args.tagged)
 
     # Run the test files in the simulator
     if args.simulator:
+        simulator_source_path = base_dir / "simulator"
+        simulator_build_path = (simulator_source_path / "build").resolve()
+
+        if not (simulator_build_path / "CMakeCache.txt").is_file():
+            subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(simulator_source_path),
+                    "-B",
+                    str(simulator_build_path),
+                ],
+                check=True,
+            )
+
+        subprocess.run(["cmake", "--build", str(simulator_build_path)], check=True)
         for file in test_files:
             run_test(file)
