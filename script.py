@@ -1,12 +1,29 @@
-import subprocess
 import argparse
 import os
 import pathlib
 import shutil
+import subprocess
 import sys
 
 
-def prepend_start_stub(asm_path: pathlib.Path):
+Path = pathlib.Path
+GENERATED_FILE_EXTENSIONS = (".ll", ".opt.ll", ".o", ".bin", ".s", ".elf")
+COMPILER_BUILD_TARGETS = (
+    "opt",
+    "llc",
+    "llvm-mc",
+    "lld",
+    "llvm-objcopy",
+    "llvm-objdump",
+)
+TAGGED_MATTR_FLAG = "--mattr=+tagged-mem-stores"
+
+
+def get_base_dir() -> Path:
+    return Path(__file__).parent.resolve()
+
+
+def prepend_start_stub(asm_path: Path) -> None:
     original = asm_path.read_text()
 
     start_stub = """\
@@ -21,7 +38,7 @@ _start:
     asm_path.write_text(start_stub + original)
 
 
-def resolve_executable(name: str, local_bin_dir: pathlib.Path | None = None) -> str:
+def resolve_executable(name: str, local_bin_dir: Path | None = None) -> str:
     candidates = [name]
     if os.name == "nt" and not name.lower().endswith(".exe"):
         candidates.insert(0, f"{name}.exe")
@@ -41,8 +58,8 @@ def resolve_executable(name: str, local_bin_dir: pathlib.Path | None = None) -> 
     sys.exit(f"Could not find executable '{name}' in PATH{search_hint}.")
 
 
-def compile_test(input_file, tagged=False):
-    base_dir = pathlib.Path(__file__).parent.resolve()
+def compile_test(input_file: str, tagged: bool = False) -> None:
+    base_dir = get_base_dir()
     test_dir = base_dir / "tests"
     compiler_bin_dir = base_dir / "compiler" / "build" / "bin"
     clang = resolve_executable("clang", compiler_bin_dir)
@@ -66,14 +83,12 @@ def compile_test(input_file, tagged=False):
     elf_path = test_dir / f"{input_no_ext}.elf"
     bin_path = test_dir / f"{input_no_ext}.bin"
 
-    tagged_mattr_flag = "--mattr=+tagged-mem-stores"
-
     # Remove old generated files
     print(f"Cleaning generated files for {input_no_ext}")
-    for ext in [".ll", ".opt.ll", ".o", ".bin", ".s", ".elf"]:
-        file = (test_dir / f"{input_no_ext}{ext}").resolve()
-        if file.exists():
-            file.unlink()
+    for ext in GENERATED_FILE_EXTENSIONS:
+        generated_file = (test_dir / f"{input_no_ext}{ext}").resolve()
+        if generated_file.exists():
+            generated_file.unlink()
 
     # .c -> .ll
     print(f"[1/6] LLVM IR: {input_file} -> {ll_path.name}")
@@ -106,7 +121,7 @@ def compile_test(input_file, tagged=False):
                 opt,
                 "-S",
                 "-passes=mem2reg",
-                tagged_mattr_flag,
+                TAGGED_MATTR_FLAG,
                 str(ll_path),
                 "-o",
                 str(opt_ll_path),
@@ -141,7 +156,7 @@ def compile_test(input_file, tagged=False):
         str(asm_path),
     ]
     if tagged:
-        llc_cmd.insert(5, tagged_mattr_flag)
+        llc_cmd.insert(5, TAGGED_MATTR_FLAG)
     subprocess.run(
         llc_cmd,
         check=True,
@@ -204,13 +219,13 @@ def compile_test(input_file, tagged=False):
     )
 
 
-def run_test(input_file):
-    base_dir = pathlib.Path(__file__).parent.resolve()
+def run_test(input_file: str | Path) -> None:
+    base_dir = get_base_dir()
     simulator_source_path = base_dir / "simulator"
     simulator_build_path = (simulator_source_path / "build").resolve()
     test_dir = (base_dir / "tests").resolve()
 
-    input_path = pathlib.Path(input_file)
+    input_path = Path(input_file)
     input_name = input_path.name
     if input_name.endswith(".c"):
         bin_name = f"{input_path.stem}.bin"
@@ -249,8 +264,17 @@ def run_test(input_file):
 
 
 def get_test_files():
-    test_dir = (pathlib.Path(__file__).parent / "tests").resolve()
+    test_dir = (Path(__file__).parent / "tests").resolve()
     return test_dir.glob("*.c")
+
+
+def normalize_c_test_name(name: str) -> str:
+    input_name = Path(name).name
+    if input_name.endswith(".c"):
+        return input_name
+    if input_name.endswith(".bin"):
+        return f"{Path(input_name).stem}.c"
+    return f"{input_name}.c"
 
 
 if __name__ == "__main__":
@@ -262,30 +286,36 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s", "--simulator", help="Enable simulator running.", action="store_true"
     )
+    parser.add_argument(
+        "-f",
+        "--file",
+        nargs="+",
+        help="Specify test file(s) to run.",
+    )
     args = parser.parse_args()
 
     # Compile all test files
-    base_dir = pathlib.Path(__file__).parent.resolve()
+    base_dir = get_base_dir()
     subprocess.run(
-        [
-            "cmake",
-            "--build",
-            "compiler/build",
-            "--target",
-            "opt",
-            "llc",
-            "llvm-mc",
-            "lld",
-            "llvm-objcopy",
-            "llvm-objdump",
-        ],
+        ["cmake", "--build", "compiler/build", "--target", *COMPILER_BUILD_TARGETS],
         check=True,
         cwd=str(base_dir),
     )
 
-    test_files = list(get_test_files())
-    for file in test_files:
-        compile_test(file.name, args.tagged)
+    all_test_files = list(get_test_files())
+    all_test_names = {file.name for file in all_test_files}
+
+    if args.file:
+        selected_test_names = [normalize_c_test_name(name) for name in args.file]
+        missing_tests = [name for name in selected_test_names if name not in all_test_names]
+        if missing_tests:
+            missing = ", ".join(missing_tests)
+            sys.exit(f"Requested test file(s) not found in tests/: {missing}")
+    else:
+        selected_test_names = [file.name for file in all_test_files]
+
+    for test_name in selected_test_names:
+        compile_test(test_name, args.tagged)
 
     # Run the test files in the simulator
     if args.simulator:
@@ -305,5 +335,6 @@ if __name__ == "__main__":
             )
 
         subprocess.run(["cmake", "--build", str(simulator_build_path)], check=True)
-        for file in test_files:
-            run_test(file)
+
+        for test_name in selected_test_names:
+            run_test(test_name)
