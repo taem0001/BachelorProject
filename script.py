@@ -99,7 +99,6 @@ def compile_test(input_file: str, tagged: bool = False) -> None:
             "-march=rv32i",
             "-mabi=ilp32",
             "-O0",
-            "-fomit-frame-pointer",
             "-Xclang",
             "-disable-O0-optnone",
             "-S",
