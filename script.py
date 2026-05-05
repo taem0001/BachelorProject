@@ -1,32 +1,30 @@
 import argparse
 import os
-import pathlib
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 
 
-def compile_test(input_file, assembly=False, tagged=False):
-    base_dir = pathlib.Path(__file__).parent.resolve()
-    subprocess.run(
-        [
-            "cmake",
-            "--build",
-            "compiler/build",
-            "--target",
-            "clang",
-            "opt",
-            "llc",
-            "llvm-objcopy",
-            "llvm-objdump",
-        ],
-        check=True,
-        cwd=str(base_dir),
-    )
+GENERATED_FILE_EXTENSIONS = [".ll", ".opt.ll", ".s", ".o", ".elf", ".bin", ".txt"]
+
+TAGGED_MATTR_FLAG = "-mattr=+tagged-mem-stores"
+
+COMPILER_BUILD_TARGETS = [
+    "clang",
+    "opt",
+    "llc",
+    "llvm-mc",
+    "llvm-objcopy",
+    "llvm-objdump",
+    "lld",
+]
 
 
 def get_base_dir() -> Path:
     return Path(__file__).parent.resolve()
+
+
 
 
 def prepend_start_stub(asm_path: Path) -> None:
@@ -101,7 +99,7 @@ def compile_test(input_file: str, tagged: bool = False) -> None:
 
     subprocess.run(
         [
-            str(compiler_bin_dir / "clang"),
+            clang,
             "--target=riscv32",
             "-march=rv32i",
             "-mabi=ilp32",
