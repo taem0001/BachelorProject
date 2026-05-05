@@ -13,6 +13,7 @@ def compile_test(input_file, assembly=False, tagged=False):
             "--build",
             "compiler/build",
             "--target",
+            "clang",
             "opt",
             "llc",
             "llvm-objcopy",
@@ -44,9 +45,10 @@ def compile_test(input_file, assembly=False, tagged=False):
 
     # .c -> .ll
     print(f"Converting {input_file} to {input_no_ext}.ll")
+
     subprocess.run(
         [
-            "clang",
+            str(compiler_bin_dir / "clang"),
             "--target=riscv32",
             "-march=rv32i",
             "-mabi=ilp32",
