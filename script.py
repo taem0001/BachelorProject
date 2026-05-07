@@ -16,7 +16,6 @@ COMPILER_BUILD_TARGETS = (
     "llvm-objcopy",
     "llvm-objdump",
 )
-TAGGED_MATTR_FLAG = "--mattr=+tagged-mem-stores"
 
 
 def get_base_dir() -> Path:
@@ -58,7 +57,7 @@ def resolve_executable(name: str, local_bin_dir: Path | None = None) -> str:
     sys.exit(f"Could not find executable '{name}' in PATH{search_hint}.")
 
 
-def compile_test(input_file: str, tagged: bool = False) -> None:
+def compile_test(input_file: str) -> None:
     base_dir = get_base_dir()
     test_dir = base_dir / "tests"
     compiler_bin_dir = base_dir / "compiler" / "build" / "bin"
@@ -76,12 +75,14 @@ def compile_test(input_file: str, tagged: bool = False) -> None:
         sys.exit("Input file is not a C file.")
 
     input_no_ext = input_path.stem
-    ll_path = test_dir / f"{input_no_ext}.ll"
-    opt_ll_path = test_dir / f"{input_no_ext}.opt.ll"
-    asm_path = test_dir / f"{input_no_ext}.s"
-    obj_path = test_dir / f"{input_no_ext}.o"
-    elf_path = test_dir / f"{input_no_ext}.elf"
-    bin_path = test_dir / f"{input_no_ext}.bin"
+    Path(test_dir / input_no_ext).mkdir(parents=True, exist_ok=True)
+
+    ll_path = test_dir / f"{input_no_ext}/{input_no_ext}.ll"
+    opt_ll_path = test_dir / f"{input_no_ext}/{input_no_ext}.opt.ll"
+    asm_path = test_dir / f"{input_no_ext}/{input_no_ext}.s"
+    obj_path = test_dir / f"{input_no_ext}/{input_no_ext}.o"
+    elf_path = test_dir / f"{input_no_ext}/{input_no_ext}.elf"
+    bin_path = test_dir / f"{input_no_ext}/{input_no_ext}.bin"
 
     # Remove old generated files
     print(f"Cleaning generated files for {input_no_ext}")
@@ -111,35 +112,18 @@ def compile_test(input_file: str, tagged: bool = False) -> None:
     )
 
     # .ll -> .opt.ll
-    if tagged:
-        print(
-            f"[2/6] Optimize IR (tagged stores): {ll_path.name} -> {opt_ll_path.name}"
-        )
-        subprocess.run(
-            [
-                opt,
-                "-S",
-                "-passes=mem2reg",
-                TAGGED_MATTR_FLAG,
-                str(ll_path),
-                "-o",
-                str(opt_ll_path),
-            ],
-            check=True,
-        )
-    else:
-        print(f"[2/6] Optimize IR: {ll_path.name} -> {opt_ll_path.name}")
-        subprocess.run(
-            [
-                opt,
-                "-S",
-                "-passes=mem2reg",
-                str(ll_path),
-                "-o",
-                str(opt_ll_path),
-            ],
-            check=True,
-        )
+    print(f"[2/6] Optimize IR: {ll_path.name} -> {opt_ll_path.name}")
+    subprocess.run(
+        [
+            opt,
+            "-S",
+            "-passes=mem2reg",
+            str(ll_path),
+            "-o",
+            str(opt_ll_path),
+        ],
+        check=True,
+    )
 
     # .opt.ll -> .s
     print(f"[3/6] Emit assembly: {opt_ll_path.name} -> {asm_path.name}")
@@ -147,15 +131,12 @@ def compile_test(input_file: str, tagged: bool = False) -> None:
         llc,
         "-mtriple=riscv32",
         "-mcpu=generic-rv32",
-        "-mattr=-c",
         "-mattr=-zca",
         "-O0",
         str(opt_ll_path),
         "-o",
         str(asm_path),
     ]
-    if tagged:
-        llc_cmd.insert(5, TAGGED_MATTR_FLAG)
     subprocess.run(
         llc_cmd,
         check=True,
@@ -167,11 +148,10 @@ def compile_test(input_file: str, tagged: bool = False) -> None:
 
     # .s -> .o
     print(f"[5/6] Assemble object: {asm_path.name} -> {obj_path.name}")
-    asm_mattr = "-mattr=+tagged-mem-stores,-c,-zca" if tagged else "-mattr=-c,-zca"
     asm_cmd = [
         llvm_mc,
         "-triple=riscv32",
-        asm_mattr,
+        "-mattr=-zca",
         "-filetype=obj",
         str(asm_path),
         "-o",
@@ -233,7 +213,8 @@ def run_test(input_file: str | Path) -> None:
     else:
         sys.exit("Input file is not a .c or .bin file.")
 
-    input_file_path = (test_dir / bin_name).resolve()
+    test_case_dir = test_dir / input_path.stem
+    input_file_path = (test_case_dir / bin_name).resolve()
     if not input_file_path.is_file():
         sys.exit(f"Compiled binary doesn't exist: {input_file_path}")
 
@@ -251,7 +232,7 @@ def run_test(input_file: str | Path) -> None:
     if simulator_executable is None:
         sys.exit(f"Could not find simulator executable in: {simulator_build_path}")
 
-    output_path = test_dir / f"{input_path.stem}.txt"
+    output_path = test_case_dir / f"{input_path.stem}.txt"
     with output_path.open("w") as output_file:
         subprocess.run(
             [str(simulator_executable), str(input_file_path)],
@@ -279,9 +260,6 @@ def normalize_c_test_name(name: str) -> str:
 if __name__ == "__main__":
     # Parse command-line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-t", "--tagged", help="Uses tagged store instructions", action="store_true"
-    )
     parser.add_argument(
         "-s", "--simulator", help="Enable simulator running.", action="store_true"
     )
@@ -314,7 +292,7 @@ if __name__ == "__main__":
         selected_test_names = [file.name for file in all_test_files]
 
     for test_name in selected_test_names:
-        compile_test(test_name, args.tagged)
+        compile_test(test_name)
 
     # Run the test files in the simulator
     if args.simulator:
