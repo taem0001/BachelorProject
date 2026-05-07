@@ -1,25 +1,34 @@
 import argparse
 import os
-import pathlib
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 
 
-Path = pathlib.Path
-GENERATED_FILE_EXTENSIONS = (".ll", ".opt.ll", ".o", ".bin", ".s", ".elf")
-COMPILER_BUILD_TARGETS = (
+GENERATED_FILE_EXTENSIONS = [".ll", ".opt.ll", ".s", ".o", ".elf", ".bin", ".txt"]
+
+TAGGED_MATTR_FLAG = "-mattr=+tagged-mem-stores"
+
+COMPILER_BUILD_TARGETS = [
+    "clang",
     "opt",
     "llc",
     "llvm-mc",
-    "lld",
     "llvm-objcopy",
     "llvm-objdump",
+<<<<<<< HEAD
 )
+=======
+    "lld",
+]
+>>>>>>> 6b802d2144c97ddd64d6c85f12c28e5a975c4456
 
 
 def get_base_dir() -> Path:
     return Path(__file__).parent.resolve()
+
+
 
 
 def prepend_start_stub(asm_path: Path) -> None:
@@ -92,7 +101,8 @@ def compile_test(input_file: str) -> None:
             generated_file.unlink()
 
     # .c -> .ll
-    print(f"[1/6] LLVM IR: {input_file} -> {ll_path.name}")
+    print(f"Converting {input_file} to {input_no_ext}.ll")
+
     subprocess.run(
         [
             clang,
