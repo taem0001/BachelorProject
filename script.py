@@ -105,6 +105,7 @@ def compile_test(input_file: str) -> None:
             "--target=riscv32",
             "-march=rv32i",
             "-mabi=ilp32",
+            "-fsigned-char",
             "-O0",
             "-Xclang",
             "-disable-O0-optnone",
