@@ -17,12 +17,8 @@ COMPILER_BUILD_TARGETS = [
     "llvm-mc",
     "llvm-objcopy",
     "llvm-objdump",
-<<<<<<< HEAD
-)
-=======
     "lld",
 ]
->>>>>>> 6b802d2144c97ddd64d6c85f12c28e5a975c4456
 
 
 def get_base_dir() -> Path:
