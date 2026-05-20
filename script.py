@@ -5,10 +5,7 @@ import shutil
 import subprocess
 import sys
 
-
 GENERATED_FILE_EXTENSIONS = [".ll", ".opt.ll", ".s", ".o", ".elf", ".bin", ".txt"]
-
-TAGGED_MATTR_FLAG = "-mattr=+tagged-mem-stores"
 
 COMPILER_BUILD_TARGETS = [
     "clang",
@@ -23,8 +20,6 @@ COMPILER_BUILD_TARGETS = [
 
 def get_base_dir() -> Path:
     return Path(__file__).parent.resolve()
-
-
 
 
 def prepend_start_stub(asm_path: Path) -> None:
@@ -103,7 +98,7 @@ def compile_test(input_file: str) -> None:
         [
             clang,
             "--target=riscv32",
-            "-march=rv32i",
+            "-march=rv32im",
             "-mabi=ilp32",
             "-fsigned-char",
             "-O0",
@@ -138,7 +133,7 @@ def compile_test(input_file: str) -> None:
         llc,
         "-mtriple=riscv32",
         "-mcpu=generic-rv32",
-        "-mattr=-zca",
+        "-mattr=-zca,+m",
         "-O0",
         str(opt_ll_path),
         "-o",
@@ -158,7 +153,7 @@ def compile_test(input_file: str) -> None:
     asm_cmd = [
         llvm_mc,
         "-triple=riscv32",
-        "-mattr=-zca",
+        "-mattr=-zca,+m",
         "-filetype=obj",
         str(asm_path),
         "-o",
@@ -291,7 +286,9 @@ if __name__ == "__main__":
 
     if args.file:
         selected_test_names = [normalize_c_test_name(name) for name in args.file]
-        missing_tests = [name for name in selected_test_names if name not in all_test_names]
+        missing_tests = [
+            name for name in selected_test_names if name not in all_test_names
+        ]
         if missing_tests:
             missing = ", ".join(missing_tests)
             sys.exit(f"Requested test file(s) not found in tests/: {missing}")
