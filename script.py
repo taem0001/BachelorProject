@@ -103,7 +103,7 @@ def compile_test(input_file: str) -> None:
         [
             clang,
             "--target=riscv32",
-            "-march=rv32i",
+            "-march=rv32im",
             "-mabi=ilp32",
             "-fsigned-char",
             "-O0",
@@ -138,7 +138,7 @@ def compile_test(input_file: str) -> None:
         llc,
         "-mtriple=riscv32",
         "-mcpu=generic-rv32",
-        "-mattr=-zca",
+        "-mattr=+m,-zca",
         "-O0",
         str(opt_ll_path),
         "-o",
