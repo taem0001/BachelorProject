@@ -1,12 +1,12 @@
 int spill_stress(int n) {
-	int a00 = 0, a01 = 1, a02 = 2, a03 = 3, a04 = 4;
-	int a05 = 5, a06 = 6, a07 = 7, a08 = 8, a09 = 9;
-	int a10 = 10, a11 = 11, a12 = 12, a13 = 13, a14 = 14;
-	int a15 = 15, a16 = 16, a17 = 17, a18 = 18, a19 = 19;
-	int a20 = 20, a21 = 21, a22 = 22, a23 = 23, a24 = 24;
-	int a25 = 25, a26 = 26, a27 = 27, a28 = 28, a29 = 29;
-	int a30 = 30, a31 = 31, a32 = 32, a33 = 33, a34 = 34;
-	int a35 = 35, a36 = 36, a37 = 37, a38 = 38, a39 = 39;
+	signed char a00 = 0, a01 = 1, a02 = 2, a03 = 3, a04 = 4;
+	signed char a05 = 5, a06 = 6, a07 = 7, a08 = 8, a09 = 9;
+	unsigned char a10 = 10, a11 = 11, a12 = 12, a13 = 13, a14 = 14;
+	unsigned short a15 = 15, a16 = 16, a17 = 17, a18 = 18, a19 = 19;
+	signed short a20 = 20, a21 = 21, a22 = 22, a23 = 23, a24 = 24;
+	unsigned short a25 = 25, a26 = 26, a27 = 27, a28 = 28, a29 = 29;
+	signed short a30 = 30, a31 = 31, a32 = 32, a33 = 33, a34 = 34;
+	unsigned char a35 = 35, a36 = 36, a37 = 37, a38 = 38, a39 = 39;
 
 	for (int i = 0; i < n; i++) {
 		a00 += i + 0;
