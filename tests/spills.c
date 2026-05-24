@@ -1,14 +1,3 @@
-<<<<<<< HEAD
-int spill_stress(int n) {
-	signed char a00 = 0, a01 = 1, a02 = 2, a03 = 3, a04 = 4;
-	signed char a05 = 5, a06 = 6, a07 = 7, a08 = 8, a09 = 9;
-	unsigned char a10 = 10, a11 = 11, a12 = 12, a13 = 13, a14 = 14;
-	unsigned short a15 = 15, a16 = 16, a17 = 17, a18 = 18, a19 = 19;
-	signed short a20 = 20, a21 = 21, a22 = 22, a23 = 23, a24 = 24;
-	unsigned short a25 = 25, a26 = 26, a27 = 27, a28 = 28, a29 = 29;
-	signed short a30 = 30, a31 = 31, a32 = 32, a33 = 33, a34 = 34;
-	unsigned char a35 = 35, a36 = 36, a37 = 37, a38 = 38, a39 = 39;
-=======
 unsigned int spill_stress(unsigned int n) {
     unsigned int a00 = 0u, a01 = 1u, a02 = 2u, a03 = 3u, a04 = 4u;
     unsigned int a05 = 5u, a06 = 6u, a07 = 7u, a08 = 8u, a09 = 9u;
@@ -18,7 +7,6 @@ unsigned int spill_stress(unsigned int n) {
     unsigned int a25 = 25u, a26 = 26u, a27 = 27u, a28 = 28u, a29 = 29u;
     unsigned int a30 = 30u, a31 = 31u, a32 = 32u, a33 = 33u, a34 = 34u;
     unsigned int a35 = 35u, a36 = 36u, a37 = 37u, a38 = 38u, a39 = 39u;
->>>>>>> 639cc6a (Updated tests)
 
     for (unsigned int i = 0u; i < n; i++) {
         a00 += i + 0u;
