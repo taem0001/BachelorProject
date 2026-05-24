@@ -18,7 +18,7 @@ int main(void) {
     int src[4] = {1, 2, 3, 6};
     int dst[4];
 
-    my_memcpy(dst, src, sizeof src);
+    my_memcpy(dst, src, sizeof(src));
 
     return dst[0] + dst[1] + dst[2] + dst[3];
 }

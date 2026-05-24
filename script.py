@@ -1,11 +1,23 @@
 import argparse
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 
-GENERATED_FILE_EXTENSIONS = [".ll", ".opt.ll", ".s", ".o", ".elf", ".bin", ".txt"]
+GENERATED_FILE_EXTENSIONS = [
+    ".ll",
+    ".opt.ll",
+    ".s",
+    ".start.o",
+    ".o",
+    ".elf",
+    ".bin",
+    ".objdump.txt",
+    ".txt",
+]
+GENERATED_ARTIFACT_SUFFIXES = ["", "_normal"]
 
 COMPILER_BUILD_TARGETS = [
     "clang",
@@ -20,21 +32,6 @@ COMPILER_BUILD_TARGETS = [
 
 def get_base_dir() -> Path:
     return Path(__file__).parent.resolve()
-
-
-def prepend_start_stub(asm_path: Path) -> None:
-    original = asm_path.read_text()
-
-    start_stub = """\
-\t.globl\t_start
-\t.p2align\t2
-\t.type\t_start,@function
-_start:
-\tcall\tmain
-\tebreak
-
-"""
-    asm_path.write_text(start_stub + original)
 
 
 def resolve_executable(name: str, local_bin_dir: Path | None = None) -> str:
@@ -57,7 +54,42 @@ def resolve_executable(name: str, local_bin_dir: Path | None = None) -> str:
     sys.exit(f"Could not find executable '{name}' in PATH{search_hint}.")
 
 
-def compile_test(input_file: str) -> None:
+def resolve_system_llvm_objdump() -> str:
+    return resolve_executable("llvm-objdump")
+
+
+def extract_biggest_objdump_address(objdump_output: str) -> int:
+    biggest_address: int | None = None
+
+    for line in objdump_output.splitlines():
+        match = re.match(r"^\s*([0-9a-fA-F]+):", line)
+        if match is None:
+            continue
+
+        address = int(match.group(1), 16)
+        if biggest_address is None or address > biggest_address:
+            biggest_address = address
+
+    if biggest_address is None:
+        sys.exit("Could not find any instruction addresses in llvm-objdump output.")
+
+    return biggest_address
+
+
+def write_objdump_address_report(
+    elf_path: Path, objdump_executable: str, report_path: Path
+) -> None:
+    completed = subprocess.run(
+        [objdump_executable, "-d", "-M", "no-aliases", str(elf_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    biggest_address = extract_biggest_objdump_address(completed.stdout)
+    report_path.write_text(f"0x{biggest_address:x}\n")
+
+
+def compile_test(input_file: str) -> Path:
     base_dir = get_base_dir()
     test_dir = base_dir / "tests"
     compiler_bin_dir = base_dir / "compiler" / "build" / "bin"
@@ -80,19 +112,22 @@ def compile_test(input_file: str) -> None:
     ll_path = test_dir / f"{input_no_ext}/{input_no_ext}.ll"
     opt_ll_path = test_dir / f"{input_no_ext}/{input_no_ext}.opt.ll"
     asm_path = test_dir / f"{input_no_ext}/{input_no_ext}.s"
+    start_source_path = test_dir / "start.s"
+    start_obj_path = test_dir / f"{input_no_ext}/{input_no_ext}.start.o"
     obj_path = test_dir / f"{input_no_ext}/{input_no_ext}.o"
     elf_path = test_dir / f"{input_no_ext}/{input_no_ext}.elf"
     bin_path = test_dir / f"{input_no_ext}/{input_no_ext}.bin"
 
     # Remove old generated files
     print(f"Cleaning generated files for {input_no_ext}")
-    for ext in GENERATED_FILE_EXTENSIONS:
-        generated_file = (test_dir / f"{input_no_ext}{ext}").resolve()
-        if generated_file.exists():
-            generated_file.unlink()
+    for artifact_suffix in GENERATED_ARTIFACT_SUFFIXES:
+        for ext in GENERATED_FILE_EXTENSIONS:
+            generated_file = (test_dir / f"{input_no_ext}{artifact_suffix}{ext}").resolve()
+            if generated_file.exists():
+                generated_file.unlink()
 
     # .c -> .ll
-    print(f"Converting {input_file} to {input_no_ext}.ll")
+    print(f"[1/6] Converting {input_file} to {input_no_ext}.ll")
 
     subprocess.run(
         [
@@ -144,9 +179,23 @@ def compile_test(input_file: str) -> None:
         check=True,
     )
 
-    # Add bare-metal entry symbol expected by the simulator.
-    print(f"[4/6] Inject startup stub into {asm_path.name}")
-    prepend_start_stub(asm_path)
+    if not start_source_path.is_file():
+        sys.exit(f"Startup assembly file doesn't exist: {start_source_path}")
+
+    # Assemble the shared startup file instead of injecting the stub inline.
+    print(f"[4/6] Assemble startup object: {start_source_path.name} -> {start_obj_path.name}")
+    subprocess.run(
+        [
+            llvm_mc,
+            "-triple=riscv32",
+            "-mattr=-zca,+m",
+            "-filetype=obj",
+            str(start_source_path),
+            "-o",
+            str(start_obj_path),
+        ],
+        check=True,
+    )
 
     # .s -> .o
     print(f"[5/6] Assemble object: {asm_path.name} -> {obj_path.name}")
@@ -179,6 +228,7 @@ def compile_test(input_file: str) -> None:
             "0x0",
             "--image-base",
             "0x0",
+            str(start_obj_path),
             str(obj_path),
             "-o",
             str(elf_path),
@@ -198,6 +248,136 @@ def compile_test(input_file: str) -> None:
         ],
         check=True,
     )
+
+    return elf_path
+
+
+def emit_clang_assembly(input_file: str) -> Path:
+    base_dir = get_base_dir()
+    test_dir = base_dir / "tests"
+    compiler_bin_dir = base_dir / "compiler" / "build" / "bin"
+    clang = resolve_executable("clang", compiler_bin_dir)
+    opt = resolve_executable("opt", compiler_bin_dir)
+    llc = resolve_executable("llc", compiler_bin_dir)
+
+    input_path = test_dir / input_file
+    if not input_path.is_file():
+        sys.exit("Input file doesn't exist.")
+    if input_path.suffix != ".c":
+        sys.exit("Input file is not a C file.")
+
+    input_no_ext = input_path.stem
+    ll_path = test_dir / f"{input_no_ext}/{input_no_ext}_normal.ll"
+    opt_ll_path = test_dir / f"{input_no_ext}/{input_no_ext}_normal.opt.ll"
+    asm_path = test_dir / f"{input_no_ext}/{input_no_ext}_normal.s"
+    start_source_path = test_dir / "start.s"
+    start_obj_path = test_dir / f"{input_no_ext}/{input_no_ext}_normal.start.o"
+    obj_path = test_dir / f"{input_no_ext}/{input_no_ext}_normal.o"
+    elf_path = test_dir / f"{input_no_ext}/{input_no_ext}_normal.elf"
+
+    print(f"[clang] Emit LLVM IR: {input_file} -> {ll_path.name}")
+    subprocess.run(
+        [
+            "clang",
+            "--target=riscv32",
+            "-march=rv32im",
+            "-mabi=ilp32",
+            "-fsigned-char",
+            "-O0",
+            "-Xclang",
+            "-disable-O0-optnone",
+            "-S",
+            "-emit-llvm",
+            str(input_path),
+            "-o",
+            str(ll_path),
+        ],
+        check=True,
+    )
+
+    print(f"[opt] Optimize IR: {ll_path.name} -> {opt_ll_path.name}")
+    subprocess.run(
+        [
+            "opt",
+            "-S",
+            "-passes=mem2reg",
+            str(ll_path),
+            "-o",
+            str(opt_ll_path),
+        ],
+        check=True,
+    )
+
+    print(f"[llc] Emit assembly: {opt_ll_path.name} -> {asm_path.name}")
+    llc_cmd = [
+        "llc",
+        "-mtriple=riscv32",
+        "-mcpu=generic-rv32",
+        "-mattr=-zca,+m",
+        "-O0",
+        str(opt_ll_path),
+        "-o",
+        str(asm_path),
+    ]
+    subprocess.run(
+        llc_cmd,
+        check=True,
+    )
+
+    if not start_source_path.is_file():
+        sys.exit(f"Startup assembly file doesn't exist: {start_source_path}")
+
+    print(f"[llvm-mc] Assemble startup object: {start_source_path.name} -> {start_obj_path.name}")
+    subprocess.run(
+        [
+            "llvm-mc",
+            "-triple=riscv32",
+            "-mattr=-zca,+m",
+            "-filetype=obj",
+            str(start_source_path),
+            "-o",
+            str(start_obj_path),
+        ],
+        check=True,
+    )
+
+    print(f"[llvm-mc] Assemble object: {asm_path.name} -> {obj_path.name}")
+    subprocess.run(
+        [
+            "llvm-mc",
+            "-triple=riscv32",
+            "-mattr=-zca,+m",
+            "-filetype=obj",
+            str(asm_path),
+            "-o",
+            str(obj_path),
+        ],
+        check=True,
+    )
+
+    print(f"[lld] Link ELF: {obj_path.name} -> {elf_path.name}")
+    subprocess.run(
+        [
+            "lld",
+            "-flavor",
+            "gnu",
+            "-m",
+            "elf32lriscv",
+            "-e",
+            "_start",
+            "-Ttext",
+            "0x0",
+            "--image-base",
+            "0x0",
+            str(start_obj_path),
+            str(obj_path),
+            "-o",
+            str(elf_path),
+        ],
+        check=True,
+    )
+
+    return elf_path
 
 
 def run_test(input_file: str | Path) -> None:
@@ -295,8 +475,31 @@ if __name__ == "__main__":
     else:
         selected_test_names = [file.name for file in all_test_files]
 
+    tagged_elf_paths = {}
+    normal_elf_paths = {}
+
     for test_name in selected_test_names:
-        compile_test(test_name)
+        tagged_elf_paths[test_name] = compile_test(test_name)
+
+    for test_name in selected_test_names:
+        normal_elf_paths[test_name] = emit_clang_assembly(test_name)
+
+    tagged_objdump = resolve_executable(
+        "llvm-objdump", base_dir / "compiler" / "build" / "bin"
+    )
+    system_objdump = resolve_system_llvm_objdump()
+
+    for test_name in selected_test_names:
+        test_case_dir = (base_dir / "tests" / Path(test_name).stem).resolve()
+        tagged_report_path = test_case_dir / f"{Path(test_name).stem}.objdump.txt"
+        normal_report_path = test_case_dir / f"{Path(test_name).stem}_normal.objdump.txt"
+
+        write_objdump_address_report(
+            tagged_elf_paths[test_name], tagged_objdump, tagged_report_path
+        )
+        write_objdump_address_report(
+            normal_elf_paths[test_name], system_objdump, normal_report_path
+        )
 
     # Run the test files in the simulator
     if args.simulator:
