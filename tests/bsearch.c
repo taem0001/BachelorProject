@@ -33,5 +33,5 @@ int main(void) {
 
 	int *found = (int *)my_bsearch(&key, values, 6, sizeof(int), int_compare);
 
-	return found ? 69 : 420;
+	return found ? 1 : 2;
 }

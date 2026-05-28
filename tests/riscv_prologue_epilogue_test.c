@@ -1,4 +1,3 @@
-
 short test(char x1, char x2, char x3, char x4, char x5, char x6, char x7, char x8, char x9, char x10, char x11, char x12, char x13,
         char x14, char x15, char x16, char x17, char x18, char x19, char x20, char x21, char x22, char x23, char x24, char x25, char x26) {
     return (x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + x12 + x13 + x14 + x15 + x16 + x17 + x18 + x19 + x20

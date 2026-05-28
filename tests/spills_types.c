@@ -51,7 +51,7 @@ int spill_stress_mixed_types(int n) {
 		uc09 += i + 39u;
 	}
 
-	return sc00 + sc01 + sc02 + sc03 + sc04 + uc00 + uc01 + uc02 + uc03 + uc04 + ss00 + ss01 + ss02 + ss03 + ss04 + 
+	return sc00 + sc01 + sc02 + sc03 + sc04 + uc00 + uc01 + uc02 + uc03 + uc04 + ss00 + ss01 + ss02 + ss03 + ss04 +
 		   us00 + us01 + us02 + us03 + us04 + si00 + si01 + si02 + si03 + si04 + ui00 + ui01 + ui02 + ui03 + ui04 +
 		   sc05 + sc06 + sc07 + sc08 + sc09 + uc05 + uc06 + uc07 + uc08 + uc09;
 }

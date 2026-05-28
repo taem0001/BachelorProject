@@ -19,7 +19,7 @@ long g(unsigned short n, signed char m) {
 
 int main() {
     unsigned short sum1 = f((signed char)5); // 15
-    long sum2 = f((signed char)8); // 36
+    int sum2 = f((signed char)8); // 36
     unsigned int sum3 = (unsigned int)g((unsigned short)5, (signed char)3); // 150
-    return (int)(sum1 + sum2 + sum3);
+    return sum1 + sum2 + sum3;
 }
