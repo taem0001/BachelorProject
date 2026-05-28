@@ -1,6 +1,6 @@
 # BachelorProject
 
-Bachelor project repository for compiling C test programs to RISC-V binaries and optionally running them in a simulator.
+Bachelor project repository for compiling C test programs to internally tagged RISC-V binaries and optionally running them in a simulator.
 
 The project ties together two submodules:
 
